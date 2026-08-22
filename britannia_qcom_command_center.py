@@ -140,7 +140,12 @@ if menu == "Executive Dashboard":
             text_color = '#991B1B' if val < 1.0 else '#065F46'
             return f'background-color: {color}; color: {text_color}; font-weight: bold;'
         
-        st.dataframe(alert_df.style.applymap(highlight_stock, subset=['Current Stock (Days)']), use_container_width=True)
+        # Version-safe Pandas styling (applymap is deprecated in Pandas 2.2.0+)
+        try:
+            styled_df = alert_df.style.map(highlight_stock, subset=['Current Stock (Days)'])
+        except AttributeError:
+            styled_df = alert_df.style.applymap(highlight_stock, subset=['Current Stock (Days)'])
+        st.dataframe(styled_df, use_container_width=True)
         st.markdown("<p style='font-size: 12px; color: #6B7280;'>*Alert trigger threshold is set to <1.0 days of safety stock. System automatically fires API dispatch protocols for flagged nodes.</p>", unsafe_allow_html=True)
 
     with right_col:
