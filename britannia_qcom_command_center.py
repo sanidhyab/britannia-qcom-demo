@@ -140,13 +140,7 @@ if menu == "Executive Dashboard":
             text_color = '#991B1B' if val < 1.0 else '#065F46'
             return f'background-color: {color}; color: {text_color}; font-weight: bold;'
         
-        # Compatible with both pandas < 2.1.0 (.applymap) and >= 2.1.0 (.map)
-        styler = alert_df.style
-        if hasattr(styler, 'map'):
-            styler = styler.map(highlight_stock, subset=['Current Stock (Days)'])
-        else:
-            styler = styler.applymap(highlight_stock, subset=['Current Stock (Days)'])
-        st.dataframe(styler, use_container_width=True)
+        st.dataframe(alert_df.style.applymap(highlight_stock, subset=['Current Stock (Days)']), use_container_width=True)
         st.markdown("<p style='font-size: 12px; color: #6B7280;'>*Alert trigger threshold is set to <1.0 days of safety stock. System automatically fires API dispatch protocols for flagged nodes.</p>", unsafe_allow_html=True)
 
     with right_col:
@@ -349,6 +343,7 @@ elif menu == "Dynamic Routing Engine":
             st.info("Set variables and click button to run simulation model.")
 
 # ----------------- PAGE 4: P&L CALCULATOR -----------------
+# ----------------- PAGE 4: P&L CALCULATOR -----------------
 elif menu == "Feasibility & P&L Calculator":
     st.markdown("# 📊 Executive Boardroom P&L Feasibility Calculator")
     st.markdown("### *Simulating the Pilot P&L and Payback Horizons*")
@@ -356,77 +351,169 @@ elif menu == "Feasibility & P&L Calculator":
 
     st.markdown("""
     FMCG executives challenge quick commerce solutions on logistics costs. Use this simulator to prove to the board how **Portfolio Premiumization** and **Stockout Recovery** completely offset the operational costs of city-side 3PL MFC operations.
+    
+    This model utilizes validated, grounded industry benchmarks for FMCG brands (including actual ₹675 Cr Britannia Q-Com scale) to test financial feasibility under conservative and rigorous operational constraints.
     """)
 
     col_slide, col_chart = st.columns([1.2, 1.5])
     
     with col_slide:
-        st.markdown("### **Interactive Variables**")
-        qcom_revenue = st.slider("Britannia Q-Com Annual Sales (₹ Cr):", 200, 1500, 675, step=25)
-        average_stockout = st.slider("Platform Stockout Rate (%):", 5.0, 25.0, 12.0, step=0.5)
-        premium_mix = st.slider("Premium Portfolio Mix (% of total Q-Com sales):", 20, 90, 65, step=5)
-        mfc_capex = st.slider("Initial Pilot Setup CapEx (₹ Cr):", 1.0, 10.0, 4.0, step=0.5)
-        mfc_opex = st.slider("Annual Pilot Operations OpEx (₹ Cr):", 0.5, 5.0, 1.0, step=0.1)
+        st.markdown("### **1. Scope & Scale Configurations**")
+        qcom_revenue = st.slider(
+            "Britannia Q-Com National Sales Baseline (₹ Cr):", 
+            200, 1500, 675, step=25,
+            help="Grounded in FY25 actuals, representing ~4% of Britannia's domestic revenue."
+        )
+        
+        pilot_scope = st.radio(
+            "Fulfillment Implementation Scope:",
+            [
+                "Regional Pilot (Delhi NCR + Mumbai) - 40% of National Base",
+                "National Rollout (Top 10 Metros) - 100% of National Base"
+            ],
+            help="Metros like Delhi and Mumbai account for ~40% of India's Q-Com sales. Rollout covers full scale."
+        )
+        
+        recovery_rate = st.slider(
+            "Sales Recovery Rate (% of Addressable Sales Base):",
+            2.0, 15.0, 6.0, step=0.5,
+            help="Conserving a 12% stockout rate. A realistic sales recovery rate (6% to 8%) represents actual returned purchase capture."
+        )
+        
+        st.markdown("---")
+        st.markdown("### **2. Assortment Strategy**")
+        assortment_strategy = st.radio(
+            "Product Assortment Portfolio Strategy:",
+            [
+                "Traditional GT Biscuit Mix (Marie Gold, Tiger)",
+                "Q-Com Premium Assortment (Good Day Chunkies, Cheese, Gifting)"
+            ],
+            help="Traditional Trade biscuits carry low gross margins (25-30%) and cannot support Q-Com costs. Premiumization shifts gross margins to 45-50%."
+        )
+        
+        if assortment_strategy == "Q-Com Premium Assortment (Good Day Chunkies, Cheese, Gifting)":
+            premium_gross_margin = st.slider("Premium SKU Gross Margin (%):", 40.0, 55.0, 48.0, step=1.0)
+            is_premium = True
+        else:
+            gross_margin = 28.0
+            is_premium = False
+            st.warning("Traditional biscuits are locked at a low Gross Margin of 28.0%.")
+            
+        st.markdown("---")
+        with st.expander("🛠️ Advanced Platform & Logistics Costs"):
+            base_commission = st.slider("Negotiated Base Platform Commission (% of Sales):", 10.0, 25.0, 18.0, step=0.5)
+            ads_spending = st.slider("Dedicated In-App Performance Ads Spend (% of Sales):", 2.0, 15.0, 6.0, step=0.5)
+            promos_funding = st.slider("Promotional Co-Funding & Invoice Discrepancies (% of Sales):", 2.0, 15.0, 6.0, step=0.5)
+            logistics_cost = st.slider("3PL Local MFC & Daily Milk-Run Fleet Operations (% of Sales):", 2.0, 15.0, 6.0, step=0.5)
+
+        st.markdown("---")
+        st.markdown("### **3. Investment Requirements**")
+        mfc_capex = st.slider("Upfront Setup CapEx (₹ Cr):", 1.0, 15.0, 4.0, step=0.5, help="Includes REST API middleware licensing, sorting automation, and local facility setup.")
+        mfc_opex = st.slider("Annual Pilot Operations OpEx (₹ Cr/year):", 0.5, 5.0, 1.0, step=0.1, help="Covers localized 3PL transit fleets, operations, and overheads.")
         
     with col_chart:
         st.markdown("### **Feasibility & EBITDA Summary Output**")
         
         # Calculations
-        # Revenue recovery model
-        recovered_revenue = qcom_revenue * (average_stockout / 100.0)
+        # 1. Determine addressable revenue base
+        if "Regional Pilot" in pilot_scope:
+            addressable_base = qcom_revenue * 0.40
+            st.info(f"📍 Addressable regional sales base for pilot: ₹{addressable_base:.1f} Cr (40% of national scale)")
+        else:
+            addressable_base = qcom_revenue
+            st.info(f"🌐 Addressable national sales base for rollout: ₹{addressable_base:.1f} Cr (100% of national scale)")
+            
+        # 2. Recovered Sales
+        recovered_sales = addressable_base * (recovery_rate / 100.0)
         
-        # Contribution margin model
-        # GT contribution = 12%
-        # Q-Com standard (low-margin) contribution = 10%
-        # Q-Com premium (high-margin) contribution = 15%
-        average_contribution_margin = (premium_mix/100.0 * 15.0) + ((100.0 - premium_mix)/100.0 * 10.0)
+        # 3. Margins
+        total_platform_cost = base_commission + ads_spending + promos_funding
         
-        incremental_ebitda = recovered_revenue * (average_contribution_margin / 100.0)
-        payback_months = (mfc_capex / (incremental_ebitda - mfc_opex)) * 12.0 if (incremental_ebitda - mfc_opex) > 0 else 999.0
+        if is_premium:
+            gross_margin = premium_gross_margin
+            net_margin = gross_margin - total_platform_cost - logistics_cost
+        else:
+            gross_margin = 28.0
+            net_margin = gross_margin - total_platform_cost - logistics_cost
+            
+        # 4. Cash Flows
+        incremental_ebitda = recovered_sales * (net_margin / 100.0)
+        net_cash_flow = incremental_ebitda - mfc_opex
         
+        if net_cash_flow > 0:
+            payback_years = mfc_capex / net_cash_flow
+            payback_months = payback_years * 12.0
+            roi = (net_cash_flow / mfc_capex) * 100.0
+        else:
+            payback_months = 999.0
+            roi = (net_cash_flow / mfc_capex) * 100.0 if mfc_capex > 0 else 0.0
+
         col_out1, col_out2 = st.columns(2)
         with col_out1:
             st.metric(
-                label="Recovered Revenue Opportunity",
-                value=f"₹{recovered_revenue:.2f} Cr",
-                delta=f"{(average_stockout):.1f}% Stockout Closed"
+                label="Recovered Revenue (Yr 1)",
+                value=f"₹{recovered_sales:.2f} Cr",
+                delta=f"{recovery_rate:.1f}% Sales Captured"
             )
-            st.metric(
-                label="Incremental EBITDA (Yr 1)",
-                value=f"₹{incremental_ebitda:.2f} Cr",
-                delta=f"Margin Mix: {average_contribution_margin:.1f}%"
-            )
+            
+            # Highlight EBITDA in green if positive, red if negative
+            if incremental_ebitda >= 0:
+                st.metric(
+                    label="Incremental EBITDA (Yr 1)",
+                    value=f"₹{incremental_ebitda:.2f} Cr",
+                    delta=f"Net Channel Margin: {net_margin:.1f}%",
+                    delta_color="normal"
+                )
+            else:
+                st.metric(
+                    label="Incremental EBITDA (Yr 1)",
+                    value=f"₹{incremental_ebitda:.2f} Cr",
+                    delta=f"Net Channel Margin: {net_margin:.1f}%",
+                    delta_color="inverse"
+                )
         with col_out2:
             if payback_months < 999 and payback_months > 0:
                 st.metric(
-                    label="Pilot Investment Payback Period",
+                    label="Investment Payback Period",
                     value=f"{payback_months:.1f} Months",
                     delta="COMPLETE BREAKEVEN",
                     delta_color="normal"
                 )
             else:
                 st.metric(
-                    label="Pilot Investment Payback",
-                    value="No Payback",
+                    label="Investment Payback",
+                    value="Infinite",
                     delta="OpEx Exceeds EBITDA",
                     delta_color="inverse"
                 )
-            st.metric(
-                label="First Year ROI (%)",
-                value=f"{((incremental_ebitda - mfc_opex) / mfc_capex * 100.0):.1f}%" if mfc_capex > 0 else "N/A"
-            )
+                
+            if roi >= 0:
+                st.metric(
+                    label="First Year ROI (%)",
+                    value=f"{roi:.1f}%",
+                    delta="Positive Net Return",
+                    delta_color="normal"
+                )
+            else:
+                st.metric(
+                    label="First Year ROI (%)",
+                    value=f"{roi:.1f}%",
+                    delta="Negative Cash Flow",
+                    delta_color="inverse"
+                )
             
         st.markdown("---")
         st.markdown("#### **Channel Margin Portfolio Comparison**")
         
         # Plot margin comparison bar chart
-        fig2, ax2 = plt.subplots(figsize=(6, 3))
+        fig2, ax2 = plt.subplots(figsize=(6, 3.2))
         fig2.patch.set_facecolor('#FAF8F5')
         ax2.set_facecolor('#FFFFFF')
         
-        labels = ['Traditional Trade (GT/MT)', 'Q-Com Core SKU', 'Q-Com Premium Assortment']
-        gross_margins = [28.0, 25.0, 43.0]
-        net_margins = [12.0, 10.0, 15.0]
+        # Comparative data
+        labels = ['Traditional (GT/MT)', 'Q-Com Core SKU', 'Q-Com Premium Assortment']
+        gross_margins = [28.0, 28.0, premium_gross_margin if is_premium else 28.0]
+        net_margins = [12.0, 28.0 - total_platform_cost - logistics_cost, net_margin if is_premium else -8.0]
         
         x = np.arange(len(labels))
         width = 0.35
@@ -434,12 +521,35 @@ elif menu == "Feasibility & P&L Calculator":
         rects1 = ax2.bar(x - width/2, gross_margins, width, label='Gross Margin (%)', color='#1B4332')
         rects2 = ax2.bar(x + width/2, net_margins, width, label='Net Contribution Margin (%)', color='#D97706')
         
+        # Add a baseline grid and line at 0% margin
+        ax2.axhline(0, color='black', linewidth=0.8, linestyle='--')
+        
         ax2.set_xticks(x)
         ax2.set_xticklabels(labels, fontsize=8)
         ax2.set_ylabel('Percentage (%)', fontsize=8)
         ax2.legend(fontsize=8, facecolor='#FAF8F5', edgecolor='#E5E7EB')
         ax2.grid(True, axis='y', linestyle=':', alpha=0.6)
-        ax2.set_ylim(0, 50)
+        ax2.set_ylim(-20, 60)
+        
+        # Label values on bars for high-impact visual representation
+        for rect in rects1:
+            height = rect.get_height()
+            ax2.annotate(f'{height:.0f}%',
+                        xy=(rect.get_x() + rect.get_width() / 2, height),
+                        xytext=(0, 2),  # 2 points vertical offset
+                        textcoords="offset points",
+                        ha='center', va='bottom', fontsize=7)
+                        
+        for rect in rects2:
+            height = rect.get_height()
+            # If negative margin, position text slightly below the bar
+            va_pos = 'top' if height < 0 else 'bottom'
+            xy_off = -10 if height < 0 else 2
+            ax2.annotate(f'{height:.1f}%',
+                        xy=(rect.get_x() + rect.get_width() / 2, height),
+                        xytext=(0, xy_off),  # vertical offset
+                        textcoords="offset points",
+                        ha='center', va=va_pos, fontsize=7, fontweight='bold')
         
         st.pyplot(fig2)
-        st.markdown("<p style='font-size: 11px; text-align: center; color: #6B7280;'>*This proves premiumizing our Q-Com assortment (Treat, gifting, premium cheeses) absorbs the increased 3PL logistics and platform commission fees to deliver a superior 15% net margin.</p>", unsafe_allow_html=True)
+        st.markdown("<p style='font-size: 11px; text-align: center; color: #6B7280;'>*Standard Q-Com SKUs yield a negative contribution margin (approx. -8%) under traditional cost structures. Premiumizing our Q-Com assortment (inducing 48% Gross Margin) easily absorbs the 30% platform take-rate and 6% logistics cost to deliver a highly viable 12% net channel contribution.</p>", unsafe_allow_html=True)
