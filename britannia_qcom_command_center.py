@@ -25,12 +25,51 @@ st.set_page_config(page_title="XYZ · Q-Commerce Supply Chain Model",
 
 st.markdown(f"""
 <style>
-  .stApp {{ background:{CREAM}; }}
-  h1,h2,h3,h4 {{ color:{INK}; }}
-  .banner {{ background:{CRIMSON}; color:#fff; padding:16px 22px;
+  /* ---- force a light surface AND light-theme text, so the app renders the
+         same whether the viewer's Streamlit is in light or dark mode ---- */
+  .stApp {{ background:{CREAM}; color:{INK}; }}
+  section.main, .block-container {{ background:{CREAM}; }}
+
+  h1,h2,h3,h4,h5,h6,
+  .stApp h1,.stApp h2,.stApp h3,.stApp h4,.stApp h5,.stApp h6 {{ color:{INK} !important; }}
+
+  [data-testid="stMarkdownContainer"] p,
+  [data-testid="stMarkdownContainer"] li,
+  [data-testid="stMarkdownContainer"] strong,
+  [data-testid="stMarkdownContainer"] em {{ color:{INK}; }}
+
+  label, [data-testid="stWidgetLabel"] p, [data-testid="stWidgetLabel"] label {{ color:{INK} !important; }}
+  [data-testid="stCaptionContainer"], [data-testid="stCaptionContainer"] p {{ color:{SLATE} !important; }}
+
+  /* tabs */
+  .stTabs [data-baseweb="tab-list"] {{ border-bottom:1px solid #E8DFD4; }}
+  .stTabs [data-baseweb="tab"] {{ color:{SLATE} !important; }}
+  .stTabs [data-baseweb="tab"] p {{ color:{SLATE} !important; font-weight:600; }}
+  .stTabs [aria-selected="true"] p {{ color:{CRIMSON} !important; }}
+
+  /* inputs — keep them light even under a dark browser theme */
+  [data-testid="stSidebar"] {{ background:#fff; }}
+  [data-testid="stSidebar"] * {{ color:{INK}; }}
+  [data-testid="stSidebar"] h1,[data-testid="stSidebar"] h2,
+  [data-testid="stSidebar"] h3 {{ color:{INK} !important; }}
+  input, .stNumberInput input, .stTextInput input {{
+      background:#fff !important; color:{INK} !important;
+      -webkit-text-fill-color:{INK} !important; }}
+  [data-baseweb="input"], [data-baseweb="base-input"] {{ background:#fff !important; }}
+  [data-testid="stNumberInputStepUp"], [data-testid="stNumberInputStepDown"] {{
+      background:#fff !important; color:{INK} !important; }}
+
+  /* tables */
+  [data-testid="stDataFrame"], [data-testid="stTable"] {{ background:#fff; }}
+  [data-testid="stDataFrame"] * {{ color:{INK} !important; }}
+
+  /* callouts */
+  [data-testid="stAlert"] p {{ color:{INK} !important; }}
+
+  .banner {{ background:{CRIMSON}; padding:16px 22px;
              border-bottom:4px solid {GOLD}; margin:-1rem -1rem 1.2rem -1rem; }}
-  .banner h1 {{ color:#fff; font-size:1.35rem; margin:0; font-weight:700; }}
-  .banner p  {{ color:{GOLDL}; font-size:.82rem; margin:.3rem 0 0 0; letter-spacing:.04em; }}
+  .banner h1 {{ color:#fff !important; font-size:1.35rem; margin:0; font-weight:700; }}
+  .banner p  {{ color:{GOLDL} !important; font-size:.82rem; margin:.3rem 0 0 0; letter-spacing:.04em; }}
   .kpi {{ background:#fff; border:1px solid #E8DFD4; border-left:4px solid {GOLD};
           padding:11px 14px; border-radius:3px; height:100%; }}
   .kpi .lbl {{ font-size:.66rem; letter-spacing:.07em; color:{SLATE}; font-weight:700; }}
@@ -38,9 +77,10 @@ st.markdown(f"""
   .kpi .sub {{ font-size:.68rem; color:{SLATE}; }}
   .note {{ background:{GOLDL}; border:1px solid {GOLD}; padding:10px 14px;
            border-radius:3px; font-size:.8rem; color:{DEEP}; }}
+  .note b {{ color:{DEEP}; }}
   .assume {{ background:#fff; border:1px dashed {GOLD}; padding:9px 13px;
              border-radius:3px; font-size:.75rem; color:{SLATE}; }}
-  [data-testid="stSidebar"] {{ background:#fff; }}
+  .assume b {{ color:{INK}; }}
 </style>
 <div class="banner">
   <h1>XYZ &nbsp;·&nbsp; Designing a Revised Supply Chain for Quick Commerce</h1>
@@ -81,6 +121,21 @@ def norm_ppf(p: float) -> float:
 # COMPAT — `use_container_width` is deprecated in newer Streamlit; `width` is
 # unsupported in older ones. Try the new API, fall back to the old.
 # ----------------------------------------------------------------------------
+def style_fig(fig, height=300):
+    """Pin every chart to a light template with explicit text colours."""
+    fig.update_layout(template="plotly_white", height=height,
+                      paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+                      font=dict(color=INK, size=12),
+                      margin=dict(l=10, r=10, t=24, b=10))
+    fig.update_xaxes(color=INK, gridcolor="#E8DFD4", linecolor="#E8DFD4",
+                     tickfont=dict(color=INK), title_font=dict(color=SLATE, size=11))
+    fig.update_yaxes(color=INK, gridcolor="#E8DFD4", linecolor="#E8DFD4",
+                     tickfont=dict(color=INK), title_font=dict(color=SLATE, size=11))
+    fig.update_traces(textfont_color=INK, selector=dict(type="waterfall"))
+    fig.update_traces(textfont_color=INK, selector=dict(type="bar"))
+    return fig
+
+
 def wide(fn, obj, **kw):
     try:
         return fn(obj, width="stretch", **kw)
@@ -231,7 +286,7 @@ with tabs[0]:
                       yaxis=dict(range=[max(0, NAT['fill_cur'] - 8), 102],
                                  title="% of PO lines fulfilled"),
                       showlegend=False, font=dict(size=12, color=INK))
-    wide(st.plotly_chart, fig)
+    wide(st.plotly_chart, style_fig(fig, 340))
 
     if time_comp > cur["No stock"]:
         st.markdown(
@@ -307,7 +362,7 @@ with tabs[1]:
                          xaxis_title="Cycle service level (%)",
                          yaxis_title="Days of cover at the node",
                          font=dict(size=11, color=INK))
-        wide(st.plotly_chart, f2)
+        wide(st.plotly_chart, style_fig(f2, 250))
         st.caption("Service level drives days of cover, which drives the MFC footprint. "
                    "This is the chain that makes the 98.2% target derived rather than asserted.")
 
@@ -373,7 +428,7 @@ with tabs[2]:
                      xaxis=dict(title="Loops despatched", range=[0, max(alloc) * 1.7]),
                      yaxis=dict(autorange="reversed"), showlegend=False,
                      font=dict(size=11, color=INK))
-    wide(st.plotly_chart, f3)
+    wide(st.plotly_chart, style_fig(f3, 250))
 
     st.markdown(
         f'<div class="note"><b>Why clustering solves the slot constraint:</b> slots are '
@@ -447,7 +502,7 @@ with tabs[3]:
                      yaxis_title="Net channel contribution (%)",
                      font=dict(size=11, color=INK),
                      legend=dict(orientation="h", y=1.15))
-    wide(st.plotly_chart, f4)
+    wide(st.plotly_chart, style_fig(f4, 270))
     be_served, be_std = GM - LOG, 28 - LOG
     st.caption(f"Breakeven cost-to-serve: **{be_served:.0f}%** on the served assortment "
                f"versus **{be_std:.0f}%** on a standard mass assortment. Assortment choice "
